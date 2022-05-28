@@ -23,9 +23,28 @@ export class ImagesService{
 
         let result;
         try{
-             result = await newImage.save();
+            let query = {'name': createImageModel.imageName};
+
+            console.log(createImageModel.imageName)
+            const filter = { name: createImageModel.imageName };
+            const update = { 
+                version :  createImageModel.version,
+                repository: createImageModel.repository,
+                metadata: createImageModel.metadata};
+            
+            // `doc` is the document _after_ `update` was applied because of
+            // `returnOriginal: false`
+            let doc = await this.imageModel.findOneAndUpdate(filter, update, { upsert:true,
+             returnOriginal: true
+            });
+            doc.name; // 'Jean-Luc Picard'
+            doc.version; // 59
+            console.log(doc);
+            // result = await this.imageModel.findOneAndUpdate(query, newImage, {upsert: true}).exec();
+            //  result = await newImage.save();
         }catch(err)
         {
+            console.log(err)
             if(err.code == '11000')
             {
                 throw new InternalServerErrorException('Duplocate Key Exception')
@@ -34,7 +53,9 @@ export class ImagesService{
                 throw new InternalServerErrorException();
             }
         }
-        return result.id as string;
+        
+        return 'some id';
+        // return result.id as string;
     }
 
     async updateImage(imageId: string,newImage: Image)

@@ -3,7 +3,7 @@ import { Deployment } from "./deployment.model";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, ObjectId } from "mongoose";
 import * as mongoose from 'mongoose'
-
+import { promises as fs } from 'fs';
 
 @Injectable()
 export class DeploymentService{
@@ -15,12 +15,15 @@ export class DeploymentService{
     {
         const imageIdObjectId =  new mongoose.Types.ObjectId(imageId)
         const newDeployment = new this.deploymentModel({
-            imageId: imageIdObjectId})
+            imageId: imageIdObjectId});
         
         let result;
         try
         {
              result = await newDeployment.save();
+             let numOfItems:number = await this.deploymentModel.count();
+             fs.writeFile('count.txt', numOfItems.toString() ,'utf8')
+
         }catch(err)
         {
             if(err.code == '11000')
@@ -33,6 +36,10 @@ export class DeploymentService{
             }
         }
         return result.id as string;
+
+
+   
+
     }
 
     async getDeployments(pageSize: number, lastItem: string)
@@ -56,24 +63,24 @@ export class DeploymentService{
         return this.deploymentModel.count();
     }
 
-
+    
     // async todelete(reqModel: CreateImageModel)
     // {
-    //     let query;
-    //     let session = null;
-    //     this.imageModel.startSession().
-       
-    //     // The `withTransaction()` function's first parameter is a function
-    //     // that returns a promise.
-    //     then(_session => {
-    //     session = _session;
-    //     return session.withTransaction(() => {
-    //     return this.imageModel.create([{ name: reqModel.imageName,version: reqModel.version, repository: reqModel.repository }], { session: session });
-    //   }) ;
-    //     }).
-    //     then(() => this.imageModel.countDocuments()).
-    //     then(count => console.log(count)).
-    //     then(() => session.endSession());
+         //     let query;
+    //      let session = null;
+    //      this.deploymentModel.startSession().
+        
+    //      // The `withTransaction()` function's first parameter is a function
+    //      // that returns a promise.
+    //      then(_session => {
+    //      session = _session;
+    //      return session.withTransaction(() => {
+    //      return this.deploymentModel.create([{ imageId: imageIdObjectId }], { session: session });
+    //    }) ;
+    //      }).
+    //      then(() => this.deploymentModel.countDocuments()).
+    //      then(count => console.log(count)).
+    //      then(() => session.endSession());
     // }
 
 
