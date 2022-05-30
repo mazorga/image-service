@@ -1,6 +1,6 @@
 In order to run on docker 
 
-change mongodb hosts from 'localhost' to 'host.docker.internal' in case you mongo running on your localhost
+Change mongodb hosts from 'localhost' to 'host.docker.internal' in case you are running mongo on your localhost
 or to your mongo host dns
 
 Run: docker-compose up dev
