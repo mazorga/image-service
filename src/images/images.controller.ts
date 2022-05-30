@@ -1,43 +1,44 @@
-import { Controller, Get, Post ,Body, Param, Query} from "@nestjs/common";
-import { ObjectId } from "mongoose";
-import { threadId } from "worker_threads";
+import { Controller, Get, Post ,Body, Param, Query, BadRequestException} from "@nestjs/common";
 import { CreateImageModel } from "./create.image.model";
 import { Image } from "./image.model";
-import { ApiBody, ApiProperty, ApiPropertyOptional} from "@nestjs/swagger";
+import { ApiBody, ApiParam, ApiProperty, ApiQuery, ApiTags} from "@nestjs/swagger";
 import { ImagesService } from "./images.service";
-import { ImageQueryModel } from "./Image.query.model";
+import { ObjectIdParam } from "../base.models/objectid.param";
+import { BasePaginationQueryModel } from "src/base.models/base.pagination.query.model";
+import { InputValidator } from "src/validators/InputValidator";
 
+@ApiTags('images')
 @Controller('api/v1/')
 export class ImagesController{
 
-    constructor(private readonly imagesService: ImagesService){}
-    
+    constructor(private readonly imagesService: ImagesService,private readonly inputValidator:InputValidator){};
     
     @Get('images/:id')
-    async  getImageById(@Param('id') imageId: string):Promise <Image>{
-        
-        return await this.imagesService.getImageById(imageId);
+    @ApiParam({name: 'imageId',description: 'image id of that we want to deploy'})
+    async  getImageById(@Param() params: ObjectIdParam):Promise <Image>
+    {
+        return await this.imagesService.getImageById(params.id);
     }
 
     @Get('images')
     async  getImages(
-    @Query() imageQuery: ImageQueryModel){
-        
+    @Query() imageQuery: BasePaginationQueryModel){
+         this.inputValidator.validateNumberInput(imageQuery.pageSize,1,120);
          return await this.imagesService.getImages(imageQuery.pageSize,imageQuery.lastItem);
     }
-    // todo check why swagger doesn't infer request model
-    // 
+
     @Post('images')
     @ApiBody({ type: CreateImageModel })
-    async createImage(@Body() createImageModel : CreateImageModel) : Promise<string>{
+        async createImage(@Body() createImageModel : CreateImageModel) : Promise<{id:string}>
+    {
         return await this.imagesService.createImage(createImageModel);
     }
-
-    //todo change return type 
-    ///api/v1/images/permutations
+    //probably should be moved to another class...
     @Get('images_permutations')
-    async  getPermutaions(){
-        
-         await this.imagesService.getAllPermutaions(2);
+    @ApiQuery({ name: 'length'  })
+    async  getPermutaions(@Query('length') length ) :Promise<string[]>
+    {
+        this.inputValidator.validateNumberInput(length.pageSize,1,120);
+         return await this.imagesService.getAllPermutaions(length);
     }
 }

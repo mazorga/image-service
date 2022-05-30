@@ -15,4 +15,3 @@ export class CreateImageModel{
     @ApiProperty()
     public metadata : object;
 }
-

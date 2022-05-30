@@ -8,17 +8,16 @@ async function bootstrap() {
 
 // Swagger
 const config = new DocumentBuilder()
-    .setTitle('Images')
+    .setTitle('Image-Service')
     .setDescription('The images API description')
     .setVersion('1.0')
     .addTag('images')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  console.log(document)
   SwaggerModule.setup('swagger', app, document);
 
 // Validation
-app.useGlobalPipes(new ValidationPipe());
+ app.useGlobalPipes(new ValidationPipe());
 
   await app.listen(3000);
 }

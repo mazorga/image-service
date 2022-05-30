@@ -1,20 +1,22 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { Image } from "./image.model";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, ObjectId } from "mongoose";
-import { time } from "console";
-import internal from "stream";
-import { filter } from "rxjs";
 import * as mongoose from 'mongoose'
+import { CombinationHelper } from "src/helpers/combinations.helper";
 import { CreateImageModel } from "./create.image.model";
 
 @Injectable()
 export class ImagesService{
 
-    constructor(@InjectModel ('Image')private  readonly imageModel:Model<Image>){}
+    constructor(@InjectModel ('Image')private  readonly imageModel:Model<Image>,
+                private   combinationsHelper: CombinationHelper){}
 
-    async createImage(createImageModel: CreateImageModel)
+    async createImage(createImageModel: CreateImageModel):Promise<{id:string}>
     {
+        // I'm not sure why the below code didn't work with dot notation https://stackoverflow.com/questions/50947772/updating-the-path-x-would-create-a-conflict-at-x
+        // all the below code should be done in 1 query
+
         const newImage = new this.imageModel({
             name: createImageModel.imageName,
             repository: createImageModel.repository,
@@ -22,58 +24,35 @@ export class ImagesService{
             metadata: createImageModel.metadata})
 
         let result;
-        try{
-            let query = {'name': createImageModel.imageName};
-
-            console.log(createImageModel.imageName)
-            const filter = { name: createImageModel.imageName };
-            const update = { 
-                version :  createImageModel.version,
-                repository: createImageModel.repository,
-                metadata: createImageModel.metadata};
-            
-            // `doc` is the document _after_ `update` was applied because of
-            // `returnOriginal: false`
-            let doc = await this.imageModel.findOneAndUpdate(filter, update, { upsert:true,
-             returnOriginal: true
-            });
-            doc.name; // 'Jean-Luc Picard'
-            doc.version; // 59
-            console.log(doc);
-            // result = await this.imageModel.findOneAndUpdate(query, newImage, {upsert: true}).exec();
-            //  result = await newImage.save();
-        }catch(err)
-        {
-            console.log(err)
-            if(err.code == '11000')
-            {
-                throw new InternalServerErrorException('Duplocate Key Exception')
-            }else
-            {
-                throw new InternalServerErrorException();
-            }
-        }
-        
-        return 'some id';
-        // return result.id as string;
-    }
-
-    async updateImage(imageId: string,newImage: Image)
-    {
-        let query = {'_id': imageId};
-
+        let currDocId;
         try
         {
-        await this.imageModel.findOneAndUpdate(query, newImage, {upsert: true}).exec();
+              result = await newImage.save();
+              currDocId = result['_id'];
         }
         catch(err)
         {
-            console.log(err);
-            throw new InternalServerErrorException("Something went wrong")
+            //upsert logic
+            if(err.code == '11000')
+            {
+                const filter = { name: createImageModel.imageName };
+                const doc = await this.imageModel.findOne(filter,'metadata')
+                const mergedMetadata = {...doc['metadata'], ...createImageModel.metadata}; 
+                console.log(newImage)
+                const update = {metadata : mergedMetadata, version: createImageModel.version, repository : createImageModel.repository};   
+                await this.imageModel.findOneAndUpdate(filter, update).exec();
+                console.log(JSON.stringify(doc));
+                currDocId = doc['_id'];
+            }
+            else
+            {
+                throw new InternalServerErrorException(err);
+            }
         }
+        return {id:currDocId};
     }
 
-    async getImageById(id: string)
+    async getImageById(id: string) :Promise<Image>
     {
         let currImage: Image;
         try
@@ -83,7 +62,7 @@ export class ImagesService{
         catch(error)
         {
             console.log(error);
-            throw new BadRequestException();
+            throw new InternalServerErrorException(error);
         }
         if(!currImage)
         {
@@ -92,23 +71,33 @@ export class ImagesService{
          return currImage as Image;
     }
 
-    async getImages(pageSize: number, lastItem: string)
+    //https://stackoverflow.com/questions/5125521/uses-for-mongodb-objectid-creation-time
+    // mongo id can order by creation day
+    //todo this code is duplication with getDeployments code ...
+    async getImages(pageSize: number, lastItem: string) :Promise<Image[]>
     {
         let query;
-        if(lastItem) {
+        if(lastItem) 
+        {
 
-            query=  this.imageModel.find({_id:{ $gt: new mongoose.Types.ObjectId(lastItem)}})
-        } else
+            query =  this.imageModel.find({_id:{ $gt: new mongoose.Types.ObjectId(lastItem)}})
+        } 
+        else
         {
             query = this.imageModel.find();
         }
-        const result =  await query.limit(pageSize).sort('_id').exec();
-        console.log(result);
+        try
+        {
+        const result =  await query.limit(pageSize).sort({'_id':-1}).exec();
         return result as Image[];
+        }catch(err)
+        {
+            throw new InternalServerErrorException(err);
+        }
     }
 
-
-   async getAllPermutaions(permutaionSize: number)
+    //todo add cache layer
+   async getAllPermutaions(permutaionSize: number): Promise<string[]>
    {
     const result = await this.imageModel.aggregate( [
         { $sort: { date: 1, item: 1 } },
@@ -118,82 +107,37 @@ export class ImagesService{
                 _id: '',
                 imageNames: { $push:   "$name" }
               },    
-
-              
-              
-              
           },
-        //   { $addFields:
-        //     {
-        //       sets:
-        //           { $function:
-        //              {
-        //                 body: function(imageNames: string[]) {
-
-        //                     const numOfItems: number = imageNames.length
-        //                     let set: [string[]] ;
-        //                     const permSize=2;
-        //                     for (let i=0; i<numOfItems; i++)
-        //                     {
-        //                         set.push()
-        //                         for(let j=i+1; j<numOfItems;j++)
-        //                         {
-
-        //                         }
-        //                     }
-        //                    return imageNames[0];
-        //                 },
-        //                 args: [ "$imageNames" ],
-        //                 lang: "js"
-        //              }
-        //           }
-        //      }
-        //   }
         ]).exec();
+
         const allNames: string[] = result[0]['imageNames']
-        let k = 2;
-        let data = new Array(k);
+        let data = new Array(permutaionSize);
         data.fill(0);
 
-       let listOfLists = []
-        this.combinationUtil(allNames,allNames.length,2,0,data,0,listOfLists)
-        console.log(listOfLists)
+       let listOfLists = [];
+       
+        this.combinationsHelper.getCombinations(allNames,allNames.length,permutaionSize,0,data,0,listOfLists);
+        return listOfLists;
    }
 
 
+   //todo - a better merge should be done with don notatin
+   //todo - move to helper
+    dotNotate(obj:object,target:object,prefix:string) {
+        target = target || {},
+        prefix = prefix || "";
+    
 
-combinationUtil(arr, n, r, index, data, i,listOfLists)
-{
-    // Current combination is ready to
-    // be printed, print it
-    if (index == r)
-    {
-        let currList = []
-        for (let j = 0; j < r; j++)
+        for (let key in obj)
         {
-            currList.push(data[j])
-        }     
-        listOfLists.push(currList)
-        return;
-    }
-
-    // When no more elements are there
-    // to put in data[]
-    if (i >= n)
-        return;
-
-    // current is included, put next
-    // at next location
-    data[index] = arr[i];
-    this.combinationUtil(arr, n, r, index + 1,
-                            data, i + 1,listOfLists);
-
-    // current is excluded, replace
-    // it with next (Note that i+1
-    // is passed, but index is not
-    // changed)
-    this.combinationUtil(arr, n, r, index,
-                            data, i + 1,listOfLists);
-}
-
+            if(typeof(obj[key]) === 'object' && obj[key] !== null)
+            {
+                this.dotNotate(obj[key],target,prefix + key + ".");
+            } else 
+            {
+                return target[prefix + key] = obj[key]; 
+            }
+        } 
+        return target;
+        };
 }

@@ -1,61 +1,6 @@
-{
-    "imageName": "123",
-    "repository": "xxx",
-    "version": "1",
-    "metadata" : {"a":1}
-}
+In order to run on docker 
 
+change mongodb hosts from 'localhost' to 'host.docker.internal' in case you mongo running on your localhost
+or to your mongo host dns
 
-abcd
-
-abc
-abd
-acd
-bcd
-
-
-123
-
-12
-13
-23
-xx  
-
-12345
-
-12
-13
-14
-15
-23
-24
-25
-34
-35
-
-
-
-12345
-
-123
-124
-125
-134
-135
-145
-234
-235
-245
-345
-
-5*4*3*2=120
-3*2 = 6
-
-120
--
-6*2
-10
-
-
-
-
+Run: docker-compose up dev
